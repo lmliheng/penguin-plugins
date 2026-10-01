@@ -1,0 +1,87 @@
+# penguin-plugins
+
+PenguinHarness 的插件集合。**一个目录 = 一个插件**，目录名就是插件名。
+
+这个仓库不是 PenguinHarness 本体的一部分，只是插件的分发点：把插件目录放进来，别人就能在 PenguinHarness 的「插件目录」里用一条 URL 直接装走。
+
+## 插件
+
+| 插件 | 版本 | 说明 |
+| --- | --- | --- |
+| [`wechat-miniprogram`](wechat-miniprogram) | 2026.10.01.1 | 在无桌面的 Linux 服务器上把微信小程序从代码做到发布：扫码登录 mp.weixin.qq.com、从公众号后台切到小程序后台、取 AppID 与上传密钥、加 IP 白名单、用 miniprogram-ci 上传、交付校验过的预览码、填写必填的用户隐私保护指引、提交审核与发布。 |
+
+版本号由各插件自己的 `plugin.json` 维护（`YYYY.MM.DD.N`），与仓库的提交历史无关——同一仓库里的插件各按自己的节奏发版。
+
+## 安装
+
+### 方式一：从仓库 URL 安装（推荐）
+
+在 PenguinHarness 的「插件目录」页面填 GitHub 的 **tree 子目录 URL**，一个插件一条：
+
+```
+https://github.com/lmliheng/penguin-plugins/tree/main/wechat-miniprogram
+```
+
+也可以直接填整个仓库 URL（`https://github.com/lmliheng/penguin-plugins`），仓库根没有 `plugin.json` 时下载器会去各子目录里找插件根；有多个插件就会列出多个让你选。
+
+下载器只取 `plugin.json` 所在的那个目录子树，不会把整个仓库拉下来。
+
+### 方式二：本地上传 zip
+
+把某个插件目录打成 zip（**顶层目录名必须是插件名**，例如 `wechat-miniprogram/`），在「插件目录」页面上传，上限 14MB。本仓库的插件都在 300KB 以内。
+
+### 方式三：直接放目录
+
+把插件目录拷到 `<app_data_dir>/plugins/<插件名>/` 下，刷新页面即可。适合本机开发调试。
+
+## 仓库结构
+
+```
+penguin-plugins/
+├── README.md                 # 你正在看的这个文件（在插件目录之外，不影响按 tree URL 安装单个插件）
+└── wechat-miniprogram/       # 一个插件 = 一个目录，目录名即插件名
+    ├── plugin.json           # 插件清单：描述、版本、preinstall
+    ├── icon.svg              # 图标
+    ├── package.json          # npm 元数据（仅用于包管理，不参与安装）
+    └── skills/
+        └── wechat-miniprogram/
+            ├── SKILL.md      # 技能说明：何时用、怎么做、坑在哪
+            ├── scripts/      # 可执行脚本
+            └── templates/    # 模板项目
+```
+
+`plugin.json` 是插件被识别的唯一依据，字段：
+
+```json
+{
+  "description": "英文描述（给模型看）",
+  "description_zh": "中文描述",
+  "short_description": "英文短描述",
+  "short_description_zh": "中文短描述",
+  "version": "2026.10.01.1",
+  "preinstall": false
+}
+```
+
+装插件时 PenguinHarness 会把 `skills/` 下的技能挂到目标 Agent 上。所以 **`skills/` 里的 `SKILL.md` 要自带 frontmatter 的 `name` / `description`**，`scripts/` 里的脚本用相对路径互相引用（`./stealth.mjs`），装完即用，不要依赖仓库外的绝对路径。
+
+## 新增一个插件
+
+1. 在仓库根建一个新目录，目录名 = 插件名（小写、连字符分隔）。
+2. 放 `plugin.json`（至少要有 `description` 和 `version`）、`icon.svg`、`skills/<技能名>/SKILL.md`。
+3. 提交推送。
+4. 安装时用 `https://github.com/lmliheng/penguin-plugins/tree/main/<插件名>`。
+
+## 约定
+
+- **不写入账号信息。** 插件是给人复用的，账号、AppID、密钥、邮箱这类东西应当由使用者在自己的记忆或环境变量里提供，不要写死进技能。脚本里凡是账号相关的值都做成命令行参数 / 环境变量，带一个中性的占位默认值。
+- **不放密钥。** 私钥、token、cookie 一律不进仓库，`private.*.key` 这类文件靠使用者在本地生成。
+- **一插件一目录、目录自包含。** 插件之间的共享代码宁可复制一份，也不要跨目录引用——按 tree URL 下载时只会取那一个子树。
+
+## 关于 npm
+
+本仓库的插件也可以发到 npm（`package.json` 已经备好 `files` / `publishConfig`），但 **PenguinHarness 的插件安装不认 npm**：远程下载只接受 zip 直链和 GitHub 仓库 / tree 子目录 URL。所以 npm 是分发渠道的补充，不是安装方式——真要发，需要先把 `package.json` 里的 scope 从上游的 `@penguinharness` 改成本账号。
+
+## License
+
+Apache-2.0

@@ -1,0 +1,14 @@
+{
+  "name": "@penguinharness/wechat-miniprogram",
+  "version": "0.1.0",
+  "description": "Publish a WeChat mini-program end to end from a headless Linux server.",
+  "license": "Apache-2.0",
+  "files": [
+    "plugin.json",
+    "icon.svg",
+    "skills"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
