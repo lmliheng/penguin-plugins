@@ -22,9 +22,12 @@ PenguinHarness 的插件集合。**一个目录 = 一个插件**，目录名就�
 https://github.com/lmliheng/penguin-plugins/tree/main/wechat-miniprogram
 ```
 
-也可以直接填整个仓库 URL（`https://github.com/lmliheng/penguin-plugins`），仓库根没有 `plugin.json` 时下载器会去各子目录里找插件根；有多个插件就会列出多个让你选。
+**用 tree URL，不要用仓库根 URL。** 两种都能装，但插件名取法不同：
 
-下载器只取 `plugin.json` 所在的那个目录子树，不会把整个仓库拉下来。
+- tree URL 的插件名 = URL 最后一段目录名 → 装成 `wechat-miniprogram` ✓
+- 仓库根 URL 的插件名 = 仓库名 → 会装成 `penguin-plugins` ✗（除非在界面的「插件名」输入框里手填）
+
+下载器只取 `plugin.json` 所在的那个目录子树：tree URL 按 URL 里的子目录定位；填仓库根 URL 时取归档里最浅的那个 `plugin.json`（本仓库就是 `wechat-miniprogram/`）。整仓下载到 32MB 上限，本仓库归档只有 70KB。
 
 ### 方式二：本地上传 zip
 
