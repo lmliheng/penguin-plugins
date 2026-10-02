@@ -2,8 +2,8 @@
 name: csu-mail
 description: Manage a Coremail mailbox (CSU student mail, mail.csu.edu.cn) over IMAP/SMTP with an app password instead of the unified auth portal — create the app password once, then list, search, read and send mail from the shell, with a copy kept in the Sent folder. Use whenever the task involves checking, sending or automating email on a CSU mailbox, or when a CAS login must be avoided.
 short_description: Coremail mailbox over IMAP/SMTP with an app password, no CAS.
-short_description_zh: Coremail 邮箱免 CAS 收发信：专用密码 + IMAP/SMTP。
-version: 2026.10.02.1
+short_description_zh: Coremail 邮箱免 CAS 收发信：专用密码 + IMAP/SMTP，发信自动留底。
+version: 2026.10.02.2
 ---
 
 # 中南大学邮箱管理（Coremail，绕开统一身份认证）
@@ -27,7 +27,13 @@ version: 2026.10.02.1
 | IMAP | `imap.csu.edu.cn:993` SSL（`mail.csu.edu.cn:993` 同样可用） |
 | POP | `pop.csu.edu.cn:995` SSL |
 | SMTP | `smtp.csu.edu.cn:465` SSL；**587 关闭、25 不通** |
-| IMAP 证书 | CN 与主机名不匹配，必须跳过证书校验，否则 `SSL: CERTIFICATE_VERIFY_FAILED` |
+| IMAP 证书 | CN = `mail.csu.edu.cn`，与主机名 `imap.csu.edu.cn` 不匹配，必须跳过证书校验，否则 `SSL: CERTIFICATE_VERIFY_FAILED` |
+
+链路实测（2026-10-02，非校园网出口）：
+
+- 两个端口都可达，**TLS1.3** 握手成功；IMAP 问候 `* OK Coremail System IMap Server Ready(...)`，
+  SMTP 问候 `220 csu.edu.cn Anti-spam GT for Coremail System (...)`；`imaplib`/`smtplib` 用跳过校验的 `SSLContext` 可直接建连。
+- 证书严格校验访问 `imap.csu.edu.cn` 必然 `Hostname mismatch`——这不是网络故障，别再往防火墙方向排查。
 
 认证的边界（都实测过）：
 
@@ -54,9 +60,15 @@ CHROME_PATH=/path/to/chrome \
   node scripts/create_apppw.mjs mail_session.json agent-server --out secret.txt
 
 # ③ 存进密钥库并删掉明文
-penguin config vault set --key CSU_MAIL_AUTHCODE --value "$(cat secret.txt)" && shred -u secret.txt
-penguin config vault set --key CSU_MAIL_ADDR --value "学号@csu.edu.cn"
+#    必须显式带 --project-id / --agent-id：CLI 的默认项目是 default_project，
+#    不带就会写进别的项目的密钥库（密钥库里查得到，环境变量里永远没有）。
+#    项目 id = 运行环境 App Data Dir 的最后一段，如 /root/.penguin/data/asass -> asass
+P="--project-id <项目id> --agent-id default_agent"
+penguin config vault set $P --key CSU_MAIL_AUTHCODE --value "$(cat secret.txt)" && shred -u secret.txt
+penguin config vault set $P --key CSU_MAIL_ADDR --value "学号@csu.edu.cn"
 ```
+
+> 写完后**当前会话仍然没有**这两个变量（见踩坑 2）；开一个新对话，或等本会话压缩后再用。
 
 > 引导用的 CAS 登录**不要重试**：失败就停下来问用户，别连续试密码。
 
@@ -77,11 +89,15 @@ $V scripts/mail.py send --to jcc@csu.edu.cn --subject "..." --body-file body.txt
 
 依赖：`requests`（只有 `mail.py` 的核心收发用标准库 `imaplib`/`smtplib`/`email`，无需三方包）。
 
+**动手前先自检**：`check` 会依次登录 IMAP 与 SMTP，两条都通过才算通。若报「缺少邮箱地址 / 缺少 CSU_MAIL_AUTHCODE」，
+那是凭据没注入，不是认证失败——去查密钥库写没写错项目（见踩坑 9），别去重试登录。
+
 ## 四、踩过的坑
 
 1. **「生成」按钮初始是 `disabled`**，弹出框里的密码名称输入框必须用**真实键盘事件**输入
    （Playwright 的 `fill()` 不行，要 `click()` + `keyboard.type()`），否则点了没反应、也不报错。
 2. **专用密码只显示一次**：生成后立刻写进密钥库；密钥库变量在**会话开始**时注入，本次会话新加的变量要等下一次对话才可见。
+   验证办法：在当前 shell 里 `echo ${#CSU_MAIL_AUTHCODE}`，非 0 才算注入成功（只输出长度，别打印明文）。
 3. **网页接口发信不留底**：`mbox:compose` 返回 `S_OK`，但「已发送」里查不到，事后无法核实送达。
    要留底就用 SMTP 发送 + `IMAP APPEND` 到 `Sent Items`（本插件的 `mail.py send` 就是这么做的）。
 4. **文件夹名含空格要加引号**（`"Sent Items"`），否则 IMAP 报 `BAD Request not ending with ...`。
@@ -89,6 +105,10 @@ $V scripts/mail.py send --to jcc@csu.edu.cn --subject "..." --body-file body.txt
 6. 网页 API 的 `func` / `sid` 必须放在 **query string**，其余字段放 form body，否则 202/失败。
 7. IMAP 证书 CN 不匹配，连接时必须 `check_hostname=False; verify_mode=CERT_NONE`。
 8. **不要把账号、密码、专用密码写进代码或提交进仓库**——凭证只放密钥库/环境变量。
+9. **`penguin config vault set/list` 的默认项目是 `default_project`**：不带 `--project-id` 就会把凭据写进另一个项目的密钥库，
+   现象是「密钥库里查得到，Agent 的 shell 里却始终没有这个变量」。2026-10-02 真实踩到：专用密码落进了 `default_project`，
+   而运行项目的 id 是 `asass`，于是 `mail.py check` 只报「缺少邮箱地址」。查证方法：
+   `penguin config vault list --project-id <项目id> --agent-id default_agent`，项目 id = App Data Dir 的最后一段。
 
 ## 五、边界
 
