@@ -1,0 +1,14 @@
+{
+  "name": "@penguinharness/csu-mail",
+  "version": "0.1.0",
+  "description": "Coremail mailbox (CSU student mail) over IMAP/SMTP with an app password, without the unified auth portal.",
+  "license": "Apache-2.0",
+  "files": [
+    "plugin.json",
+    "icon.svg",
+    "skills"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}
