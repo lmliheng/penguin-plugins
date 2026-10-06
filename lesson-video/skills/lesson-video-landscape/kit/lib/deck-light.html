@@ -1,0 +1,740 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>算法专题 · 横屏课件（浅色演讲版）</title>
+<style>
+  /* 1920x1080 横屏课件 · 浅色演讲版。所有画面都从时间 t 算出来，不用 CSS 过渡，保证逐帧可复现。
+     手机横屏时右侧是按钮区、底部是进度与标题，所以右边留 240px、下边留 260px。
+     内容可用区 = 1920-240-120 × 1080-140-260 = 1560 x 680（y 140 → 820，820 是自检安全线）。 */
+  :root{
+    --bg:#ffffff;
+    --ink:#0b1220;          /* 主文字 */
+    --ink2:#475569;         /* 次级 */
+    --ink3:#94a3b8;         /* 弱化 */
+    --line:#e6ebf2;         /* 细线 */
+    --line2:#cbd5e1;
+    --surface:#f8fafc;      /* 卡片底 */
+    --accent:#2563eb;
+    --accent-ink:#1d4ed8;
+    --accent-soft:#eef4ff;
+    --accent-line:#bfd4ff;
+    --ptr-l:#0d9488;        /* 左指针 */
+    --ptr-r:#2563eb;        /* 右指针 */
+    --ok:#0f9d58;
+    --bad:#dc2626;
+    --mono:"Cascadia Mono",Consolas,ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"Noto Sans SC","MiSans","Segoe UI",system-ui,sans-serif;
+    --ease:cubic-bezier(.2,.7,.3,1);
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  html,body{margin:0;padding:0;width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-feature-settings:"tnum" 1}
+  code,pre,.mono{font-family:var(--mono)}
+
+  /* 极淡的底纹：点阵 + 右上角一抹冷色，白底不显空，也不抢内容 */
+  #bg{position:absolute;inset:0;
+    background-image:radial-gradient(rgba(148,163,184,.28) 1.4px,transparent 1.4px);
+    background-size:56px 56px}
+  #glow{position:absolute;right:-320px;top:-360px;width:1100px;height:1100px;border-radius:50%;
+    background:radial-gradient(circle,rgba(37,99,235,.10),rgba(37,99,235,0) 62%);pointer-events:none}
+
+  #bar{position:absolute;left:0;top:0;width:1920px;height:5px;background:#f1f5f9;z-index:40}
+  #barfill{height:100%;width:0;background:var(--accent)}
+
+  #brand{position:absolute;left:120px;top:38px;z-index:35;display:flex;align-items:center;gap:14px;
+    font-size:26px;color:var(--ink2);letter-spacing:.01em}
+  #brand .mark{width:32px;height:32px;border-radius:10px 10px 10px 4px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:#fff}
+  #wm{position:absolute;right:240px;top:40px;z-index:35;font-size:22px;letter-spacing:.02em;
+    color:var(--ink3);font-family:var(--mono)}
+
+  .scene{position:absolute;left:0;top:0;width:1920px;height:1080px;
+    padding:132px 240px 260px 120px;display:none;flex-direction:column;justify-content:flex-start;
+    will-change:transform,opacity}
+  .scene.on{display:flex}
+  .scene.center{justify-content:center;padding-bottom:360px}
+
+  /* 小标签：一条短横线 + 序号，像演讲幻灯片的章节标记 */
+  .kicker{display:flex;align-items:center;gap:16px;font-size:25px;font-weight:500;color:var(--accent-ink);
+    letter-spacing:.06em;margin-bottom:18px}
+  .kicker::before{content:"";width:44px;height:4px;border-radius:2px;background:var(--accent)}
+  .stitle{font-size:58px;font-weight:700;letter-spacing:-.02em;line-height:1.22;margin:0 0 34px;text-wrap:balance}
+
+  /* 开场 */
+  .hero{font-size:112px;font-weight:800;letter-spacing:-.045em;line-height:1.06;margin:0 0 26px;text-wrap:balance}
+  .hero-sub{font-size:42px;font-weight:400;color:var(--ink2);line-height:1.45;margin:0 0 40px}
+  .rule{width:180px;height:6px;border-radius:3px;background:var(--accent);margin-bottom:36px}
+  .tags{display:flex;flex-wrap:wrap;gap:14px}
+  .tag{border:1.5px solid var(--line2);border-radius:9999px;padding:10px 26px;font-size:26px;color:var(--ink2)}
+
+  /* 要点 */
+  .pt{display:flex;gap:26px;align-items:flex-start;margin-bottom:26px}
+  .pt .no{flex:0 0 auto;width:52px;height:52px;border-radius:14px;background:var(--accent-soft);
+    border:1.5px solid var(--accent-line);color:var(--accent-ink);
+    font-weight:700;font-size:28px;display:flex;align-items:center;justify-content:center;margin-top:2px}
+  .pt .tx{font-size:36px;line-height:1.5;color:var(--ink)}
+  .pt .tx em{font-style:normal;color:var(--accent-ink);font-weight:700}
+  .pt .tx b{font-weight:700}
+
+  /* 数组 / 指针可视化 */
+  .viz{flex:1;display:flex;flex-direction:column;justify-content:center;min-height:0}
+  .rowwrap{position:relative;display:flex;justify-content:center;align-items:center;padding:100px 0}
+  .cells{display:flex;gap:16px;justify-content:center;align-items:center}
+  .cell{flex:0 0 auto;width:104px;height:104px;border-radius:16px;background:var(--surface);
+    border:1.5px solid var(--line);color:var(--ink);
+    font-size:48px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .cell.in{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
+  .winbox{position:absolute;border:2.5px solid var(--accent);background:rgba(37,99,235,.05);
+    border-radius:22px;pointer-events:none}
+  .ptr{position:absolute;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+  .ptr .cap{font-size:22px;font-weight:600;letter-spacing:.08em}
+  .ptr .badge{width:52px;height:52px;border-radius:14px;color:#fff;font-size:28px;font-weight:700;
+    display:flex;align-items:center;justify-content:center}
+  .ptr.r{flex-direction:column}
+  .ptr.r .badge{background:var(--ptr-r)}   .ptr.r .cap{color:var(--ptr-r)}
+  .ptr.l{flex-direction:column-reverse}
+  .ptr.l .badge{background:var(--ptr-l)}   .ptr.l .cap{color:var(--ptr-l)}
+  .target{display:inline-flex;align-items:baseline;gap:10px;margin-top:4px;font-size:26px;color:var(--ink2)}
+  .target b{font-size:34px;color:var(--ink);font-weight:700}
+
+  .readout{display:flex;align-items:center;gap:18px;justify-content:center;margin-top:40px}
+  .chip{display:flex;align-items:baseline;gap:12px;border:1.5px solid var(--line);border-radius:16px;
+    background:#fff;padding:14px 26px}
+  .chip i{font-style:normal;font-size:24px;color:var(--ink3);letter-spacing:.04em}
+  .chip b{font-size:44px;font-weight:700}
+  .chip .unit{font-size:24px;color:var(--ink3)}
+  .chip.hot{border-color:var(--accent-line);background:var(--accent-soft)}
+  .chip.hot b{color:var(--accent-ink)}
+  .chip.done{border-color:#b7e4c7;background:#f0fdf4}
+  .chip.done b{color:var(--ok)}
+  .verdict{font-size:32px;font-weight:600;color:var(--ink2);min-width:420px}
+  /* 可视化幕型高的那几种（表格 / 调用栈 / 树 / 图 / 集合）把结论条并进读数行，省下一整行高度 */
+  .tkinline{font-size:28px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);
+    border:1.5px solid var(--accent-line);border-radius:14px;padding:12px 22px}
+
+  /* 流程图 */
+  .flow{flex:1;display:flex;align-items:center;justify-content:center;gap:22px;min-height:0}
+  .fnode{width:300px;border:1.5px solid var(--line);border-radius:22px;background:#fff;
+    padding:28px 26px;text-align:left}
+  .fnode .ft{font-size:38px;font-weight:700;margin-bottom:12px}
+  .fnode .fs{font-size:26px;color:var(--ink2);line-height:1.45}
+  .fnode.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 10px 30px rgba(37,99,235,.10)}
+  .fnode.on .ft{color:var(--accent-ink)}
+  .fnode.done{border-color:#b7e4c7;background:#f0fdf4}
+  .fnode.done .ft{color:var(--ok)}
+  .farrow{font-size:44px;color:var(--line2)}
+
+  /* 一维数组的「来源格子」与「已归位」：讲 DP 时用 */
+  .cell.src{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.16)}
+  .cell.done{border-color:#b7e4c7;background:#f0fdf4;color:var(--ok)}
+
+  /* 二维表格：逐格填 */
+  .gridwrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+  table.grid{border-collapse:separate;border-spacing:9px}
+  table.grid th{font-size:28px;font-weight:600;color:var(--ink2);min-width:96px;text-align:center;padding:0 4px}
+  table.grid th.corner{color:var(--ink3)}
+  table.grid td.gc{width:92px;height:78px;border-radius:14px;background:var(--surface);border:1.5px solid var(--line);
+    font-size:34px;font-weight:700;text-align:center;color:var(--ink3)}
+  table.grid td.gc.filled{color:var(--ink)}
+  table.grid td.gc.src{border-color:var(--accent-line);background:#fff;color:var(--accent-ink)}
+  table.grid td.gc.cur{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);
+    box-shadow:0 10px 26px rgba(37,99,235,.14)}
+
+  /* 调用栈：栈顶在上，向下是更早压进来的帧 */
+  .stkwrap{flex:1;display:flex;align-items:center;justify-content:center;gap:64px;min-height:0}
+  .stk{display:flex;flex-direction:column;gap:12px;align-items:center}
+  .frame{width:820px;display:flex;align-items:center;gap:28px;border:1.5px solid var(--line);border-radius:16px;
+    background:#fff;padding:16px 28px;opacity:.22}
+  .frame.on{opacity:1}
+  .frame.top{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 10px 30px rgba(37,99,235,.10)}
+  .frame .ff{font-family:var(--mono);font-size:36px;font-weight:700;min-width:280px;color:var(--ink)}
+  .frame.top .ff{color:var(--accent-ink)}
+  .frame .fs{font-size:26px;color:var(--ink2)}
+  .stkret{display:flex;flex-direction:column;align-items:center;gap:10px;border-left:2px dashed var(--line2);padding:26px 0 26px 64px}
+  .stkret .lab{font-size:24px;color:var(--ink3);letter-spacing:.06em}
+  .stkret .val{font-size:62px;font-weight:800;color:var(--ok);font-family:var(--mono)}
+
+  /* 递归树 / 决策树：位置由 JS 按父指针算 */
+  .treewrap{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+  .treewrap svg{overflow:visible}
+  .tedge{stroke:var(--line2);stroke-width:2.5;fill:none}
+  .tnode rect{fill:#fff;stroke:var(--line2);stroke-width:2.5;rx:16}
+  .tnode text{font-size:25px;font-weight:600;fill:var(--ink);font-family:var(--mono);text-anchor:middle}
+  .tnode.open rect{fill:var(--accent-soft);stroke:var(--accent)}
+  .tnode.open text{fill:var(--accent-ink);font-weight:700}
+  .tnode.prune rect{fill:#fef2f2;stroke:var(--bad);stroke-dasharray:8 6}
+  .tnode.prune text{fill:var(--bad);text-decoration:line-through}
+  .tnode.hid,.tedge.hid{opacity:0}
+
+  /* 图：节点 + 边 + 队列条 */
+  .gwrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;min-height:0}
+  .gwrapsvg{display:flex;align-items:center;justify-content:center}
+  .gwrapsvg svg{overflow:visible}
+  .gedge{stroke:var(--line2);stroke-width:3}
+  .gedge.hot{stroke:var(--accent);stroke-width:5}
+  .gnode rect{fill:#fff;stroke:var(--line2);stroke-width:2.5}
+  .gnode text{font-size:28px;font-weight:700;fill:var(--ink);text-anchor:middle;dominant-baseline:middle}
+  .gnode.seen rect{fill:var(--accent-soft);stroke:var(--accent-line)}
+  .gnode.cur rect{fill:var(--accent);stroke:var(--accent)}
+  .gnode.cur text{fill:#fff}
+  .gnode.hid{opacity:0}
+  .qbar{display:flex;align-items:center;gap:14px;min-height:62px}
+  .qbar .ql{font-size:24px;color:var(--ink3);letter-spacing:.06em}
+  .qbar .qi{border:1.5px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-ink);
+    border-radius:12px;padding:8px 22px;font-size:28px;font-weight:700;font-family:var(--mono)}
+
+  /* 集合合并（并查集） */
+  .grwrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:30px;min-height:0}
+  .grrow{display:flex;align-items:center;justify-content:center;gap:20px;flex-wrap:wrap;max-width:1560px}
+  .grp{border:1.5px solid var(--line);border-radius:20px;background:#fff;padding:20px 32px;text-align:center}
+  .grp .gt{font-size:40px;font-weight:700;font-family:var(--mono)}
+  .grp .gs{font-size:24px;color:var(--ink2);margin-top:6px}
+  .grp.hi{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 10px 30px rgba(37,99,235,.10)}
+  .grp.hi .gt{color:var(--accent-ink)}
+  .grp.gone{opacity:.32}
+  .grarrow{font-size:38px;color:var(--accent);font-weight:700}
+
+  /* 代码：浅色主题，行宽按等宽 30px 计（写稿限 ≤84 字符） */
+  .card{border:1.5px solid var(--line);border-radius:18px;background:var(--surface);overflow:hidden}
+  .card-hd{display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1.5px solid var(--line);
+    font-size:24px;color:var(--ink3);font-family:var(--mono)}
+  .card-hd .dots{display:flex;gap:8px}
+  .card-hd .dots i{width:12px;height:12px;border-radius:9999px;background:var(--line2);display:block}
+  .card-bd{padding:20px 30px 22px;font-size:28px;line-height:1.55;white-space:pre;overflow:hidden;color:#111827}
+  .ln{display:block}
+  .k{color:#cf222e}     /* 关键字 */
+  .s{color:#0a3069}     /* 字符串 */
+  .c{color:#8b949e;font-style:italic}   /* 注释 */
+  .n{color:#0550ae}     /* 数字 */
+  .f{color:#8250df}     /* 调用 */
+  .m{color:var(--ink2)}
+
+  /* 结论条 */
+  .takeaway{display:flex;align-items:center;gap:18px;margin-top:26px;padding:18px 26px;border-radius:16px;
+    background:var(--accent-soft);border:1.5px solid var(--accent-line);font-size:32px;font-weight:600;
+    color:var(--accent-ink)}
+
+  /* 结尾 */
+  .outro{font-size:96px;font-weight:800;letter-spacing:-.04em;line-height:1.08;margin:0 0 26px;text-wrap:balance}
+  .outro-sub{font-size:40px;color:var(--ink2);margin:0 0 48px}
+  .cta{display:inline-block;background:var(--accent);color:#fff;font-size:34px;font-weight:700;
+    border-radius:14px;padding:20px 44px}
+
+  /* 字幕：830 起，上一句 + 当前句；白底不用阴影 */
+  #subs{position:absolute;left:0;top:830px;width:1920px;height:220px;z-index:30;text-align:center}
+  .sub{position:absolute;left:260px;width:1400px;text-align:center;font-size:44px;line-height:1.32;font-weight:700}
+  .sub.prev{top:0;font-size:34px;font-weight:400;color:var(--ink3)}
+  .sub.cur{top:62px;color:var(--ink)}
+</style>
+</head>
+<body>
+<div id="bg"></div>
+<div id="glow"></div>
+<div id="brand"><span class="mark" id="brand-mark"></span><span id="brand-text"></span></div>
+<div id="wm"></div>
+<div id="scenes"></div>
+<div id="subs"><div class="sub prev" id="sub-prev"></div><div class="sub cur" id="sub-cur"></div></div>
+<div id="bar"><div id="barfill"></div></div>
+
+<script>
+"use strict";
+const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+
+/* ---------- 极简 Python 语法高亮（离线、确定性，浅色配色见 CSS） ---------- */
+const PY_MASTER = /(#[^\n]*)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*")|\b(\d+\.?\d*)\b|\b(from|import|def|class|return|if|elif|else|for|in|while|with|as|not|and|or|None|True|False|lambda|self|print)\b|([A-Za-z_][A-Za-z_0-9]*)(?=\()/g;
+function highlight(src){
+  let out = "", last = 0, m;
+  PY_MASTER.lastIndex = 0;
+  while ((m = PY_MASTER.exec(src)) !== null) {
+    out += esc(src.slice(last, m.index));
+    const [full, comment, str, num, kw, fn] = m;
+    const cls = comment ? "c" : str ? "s" : num ? "n" : kw ? "k" : "f";
+    out += `<span class="${cls}">${esc(full)}</span>`;
+    last = m.index + full.length;
+  }
+  out += esc(src.slice(last));
+  return out;
+}
+function codeLines(code, dur, reveal){
+  const lines = code.split("\n");
+  const n = lines.length;
+  const secs = Math.min(reveal || 4.5, (dur || 10) * 0.55);
+  const start = 0.04 * (dur || 10);
+  const step = n > 1 ? (secs - start) / (n - 1) : 0;
+  return lines.map((l, i) =>
+    `<span class="ln" data-at="${Math.max(0, start + i * step).toFixed(2)}">${l ? highlight(l) : " "}</span>`).join("");
+}
+
+/* 出现时机：优先用脚本里写死的秒数 at（贴着讲解走），否则按场景进度比例 r */
+function at(item, r){
+  return (item && item.at !== undefined) ? `data-at="${item.at}"` : `data-r="${r.toFixed(2)}"`;
+}
+
+/* ---------- 各幕模板 ---------- */
+const T = {
+  title: (s) => `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h1 class="hero" data-r="0.06">${esc(s.title)}</h1>
+    <div class="rule" data-r="0.12"></div>
+    <p class="hero-sub" data-r="0.16">${esc(s.sub)}</p>
+    <div class="tags">${(s.tags||[]).map((t,i)=>`<span class="tag" data-r="${(0.24+i*0.07).toFixed(2)}">${esc(t)}</span>`).join("")}</div>`,
+
+  points: (s) => `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="viz">
+    ${(s.items||[]).map((t,i)=>`<div class="pt" data-r="${(0.16+i*0.13).toFixed(2)}">
+        <span class="no">${i+1}</span><div class="tx">${t}</div></div>`).join("")}
+    </div>
+    ${s.takeaway ? `<div class="takeaway" data-r="0.72"><span>${s.takeaway}</span></div>` : ""}`,
+
+  code: (s) => `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="card" data-r="0.10">
+      <div class="card-hd"><span class="dots"><i></i><i></i><i></i></span>${esc(s.file)}</div>
+      <div class="card-bd">${codeLines(s.code, s.dur, s.code_reveal)}</div>
+    </div>`,
+
+  /* 一维数组：steps 里每一步给出 l / r 与读数，tts.py 会把每个 step 的 "cue" 解析成相对本幕的秒数 at。
+     读数芯片两种写法：老式（窗口和/窗口长度/目标/最短，由 sum/len/target/best 驱动）
+     或自定义 chips（[{k,label}]，值从本步的 vals 里取）——讲 DP / 前缀和时用后者，并 hideWin。 */
+  array: (s) => {
+    const cells = (s.values||[]).map((v,i)=>`<div class="cell" data-i="${i}" data-at="${(0.35+i*0.06).toFixed(2)}">${esc(v)}</div>`).join("");
+    const lL = s.lblL || "L", lR = s.lblR || "R";
+    const chips = s.chips
+      ? s.chips.map((c)=>`<div class="chip"><i>${esc(c.label)}</i><b class="v-c" data-k="${esc(c.k)}">—</b></div>`).join("")
+      : `<div class="chip"><i>窗口和</i><b class="v-sum">0</b></div>
+         <div class="chip"><i>窗口长度</i><b class="v-len">0</b></div>`
+        + (s.target !== undefined ? `<div class="chip"><i>目标</i><b>${esc(s.target)}</b></div>` : "")
+        + (s.best !== undefined ? `<div class="chip done"><i>最短</i><b class="v-best">—</b></div>` : "");
+    return `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="viz" data-r="0.10">
+      <div class="rowwrap">
+        ${s.hideWin ? "" : `<div class="winbox"></div>`}
+        <div class="ptr r"><span class="cap">${esc(lR)}</span><span class="badge">${esc(lR)}</span></div>
+        <div class="cells">${cells}</div>
+        <div class="ptr l"><span class="cap">${esc(lL)}</span><span class="badge">${esc(lL)}</span></div>
+      </div>
+      <div class="readout">${chips}<div class="verdict v-note"></div></div>
+    </div>`;
+  },
+
+  /* 二维表格：steps 逐步把格子填上，r / c 是数据区下标，from 是要圈出来的来源格 */
+  grid: (s) => {
+    const rows = s.rows||[], cols = s.cols||[];
+    const head = `<tr><th class="corner"></th>${cols.map((c)=>`<th>${esc(c)}</th>`).join("")}</tr>`;
+    const body = rows.map((r,ri)=>`<tr><th>${esc(r)}</th>`+cols.map((_,ci)=>
+      `<td class="gc" data-row="${ri}" data-col="${ci}"></td>`).join("")+`</tr>`).join("");
+    const chips = (s.chips||[{k:"v",label:"dp 值"}]).map((c)=>
+      `<div class="chip"><i>${esc(c.label)}</i><b class="v-c" data-k="${esc(c.k)}">—</b></div>`).join("");
+    return `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="gridwrap" data-r="0.10"><table class="grid">${head}${body}</table></div>
+    <div class="readout">${chips}<div class="verdict v-note"></div>${s.takeaway ? `<div class="tkinline">${esc(s.takeaway)}</div>` : ""}</div>`;
+  },
+
+  /* 调用栈：frames 从栈底到栈顶；steps 的 d 是当前可见到第几层（0 起，含），ret 是本步的返回值 */
+  stack: (s) => {
+    const items = (s.frames||[]).map((f,i)=>
+      `<div class="frame" data-i="${i}"><span class="ff">${esc(f.f)}</span><span class="fs">${esc(f.s||"")}</span></div>`).reverse().join("");
+    return `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="stkwrap" data-r="0.10">
+      <div class="stk">${items}</div>
+      <div class="stkret"><span class="lab">这一刻的返回值</span><span class="val v-ret">—</span></div>
+    </div>
+    <div class="readout"><div class="verdict v-note"></div>${s.takeaway ? `<div class="tkinline">${esc(s.takeaway)}</div>` : ""}</div>`;
+  },
+
+  /* 递归树 / 决策树：节点按父指针分层，同层左右排开；steps 的 open 是已展开的节点，prune 是剪掉的 */
+  tree: (s) => {
+    const nodes = s.nodes||[];
+    const byId = new Map(nodes.map((n)=>[n.id,n]));
+    const depth = (n)=>{ let d=0,p=n.p; while(p!=null && byId.has(p)){ d++; p=byId.get(p).p; } return d; };
+    const levels = [];
+    nodes.forEach((n)=>{ const d=depth(n); if(!levels[d]) levels[d]=[]; levels[d].push(n); });
+    const tw = (t)=>[...String(t||"")].reduce((a,c)=>a+(c.charCodeAt(0)>255?26:15),0);
+    const NH = 140, CW = 1560;
+    const pos = new Map();
+    levels.forEach((lv,d)=>lv.forEach((n,ix)=>{
+      const w = Math.max(160, tw(n.t||n.id)+64);
+      pos.set(n.id, { x:(ix+0.5)*(CW/lv.length), y:d*NH+46, w });
+    }));
+    const H = levels.length*NH + 40;
+    // svg 显式给一个更矮的高度：viewBox 固定，浏览器会等比缩放把整棵树塞进画面，不会压到字幕
+    const dispH = Math.min(H, 396);
+    const edges = nodes.filter((n)=>n.p!=null && pos.has(n.p) && pos.has(n.id)).map((n)=>{
+      const a=pos.get(n.p), b=pos.get(n.id);
+      return `<path class="tedge" data-child="${esc(n.id)}" d="M ${a.x} ${a.y+34} C ${a.x} ${a.y+86}, ${b.x} ${b.y-86}, ${b.x} ${b.y-36}"/>`;
+    }).join("");
+    const ns = nodes.map((n)=>{ const p=pos.get(n.id);
+      return `<g class="tnode hid" data-id="${esc(n.id)}" transform="translate(${p.x},${p.y})">
+        <rect x="${-p.w/2}" y="-34" width="${p.w}" height="68" rx="16"/>
+        <text y="1" dominant-baseline="middle">${esc(n.t||n.id)}</text></g>`; }).join("");
+    return `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="treewrap" data-r="0.10"><svg width="${CW}" height="${dispH}" viewBox="0 0 ${CW} ${H}">${edges}${ns}</svg></div>
+    <div class="readout"><div class="verdict v-note"></div>${s.takeaway ? `<div class="tkinline">${esc(s.takeaway)}</div>` : ""}</div>`;
+  },
+
+  /* 图：nodes 的 x / y 是百分比位置；steps 给出已访问节点、当前节点、高亮的边与队列内容 */
+  graph: (s) => {
+    const nodes = s.nodes||[], edges = s.edges||[];
+    const GW = 1480, GH = 460;
+    // 画面里只占这么多高：viewBox 固定 1480x460，缩小显示时整体等比缩放
+    const dispH = 348;
+    const byId = new Map(nodes.map((n)=>[n.id,n]));
+    const P = (n)=>({ x:(n.x/100)*GW, y:(n.y/100)*GH });
+    const es = edges.map((e)=>{
+      const a=byId.get(e[0]), b=byId.get(e[1]);
+      if(!a||!b) return "";
+      const p=P(a), q=P(b);
+      return `<line class="gedge" data-a="${esc(e[0])}" data-b="${esc(e[1])}" x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}"/>`;
+    }).join("");
+    const ns = nodes.map((n)=>{ const p=P(n); const w=Math.max(104, [...String(n.t||n.id)].reduce((a,c)=>a+(c.charCodeAt(0)>255?30:17),0)+56);
+      return `<g class="gnode" data-id="${esc(n.id)}" transform="translate(${p.x},${p.y})">
+        <rect x="${-w/2}" y="-38" width="${w}" height="76" rx="18"/>
+        <text y="1" dominant-baseline="middle">${esc(n.t||n.id)}</text></g>`; }).join("");
+    return `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="gwrap" data-r="0.10">
+      <div class="gwrapsvg"><svg width="${GW}" height="${dispH}" viewBox="0 0 ${GW} ${GH}">${es}${ns}</svg></div>
+      <div class="qbar"><span class="ql">队列</span><span class="v-queue"></span></div>
+    </div>
+    <div class="readout"><div class="verdict v-note"></div>${s.takeaway ? `<div class="tkinline">${esc(s.takeaway)}</div>` : ""}</div>`;
+  },
+
+  /* 集合合并：steps 每一步给出当时的全部集合，hi 是这一句在讲哪几个，merge 是要合并的两个 */
+  groups: (s) => `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="grwrap" data-r="0.10">
+      <div class="grrow"></div>
+    </div>
+    <div class="readout"><div class="verdict v-note"></div>${s.takeaway ? `<div class="tkinline">${esc(s.takeaway)}</div>` : ""}</div>`,
+
+
+  /* 流程图：nodes 一行排开，steps 里的 i 指定当前讲到第几个 */
+  flow: (s) => `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="stitle" data-r="0.06">${esc(s.title)}</h2>
+    <div class="flow" data-r="0.10">
+      ${(s.nodes||[]).map((nd,i)=>`${i?`<span class="farrow">→</span>`:""}<div class="fnode" data-i="${i}">
+        <div class="ft">${esc(nd.t)}</div><div class="fs">${esc(nd.s)}</div></div>`).join("")}
+    </div>
+    ${s.takeaway ? `<div class="takeaway" data-r="0.78"><span>${esc(s.takeaway)}</span></div>` : ""}`,
+
+  outro: (s) => `
+    <div class="kicker" data-r="0.02">${esc(s.kicker)}</div>
+    <h2 class="outro" data-r="0.08">${esc(s.title)}</h2>
+    <p class="outro-sub" data-r="0.16">${esc(s.sub)}</p>
+    <div ${at({at:s.cta_at}, 0.30)}><span class="cta">${esc(s.cta)}</span></div>`
+};
+
+/* ---------- 缓动：与设计规范同一条 cubic-bezier(.2,.7,.3,1) ---------- */
+function cubicBezier(x1,y1,x2,y2){
+  const A=(a,b)=>1-3*b+3*a, B=(a,b)=>3*b-6*a, C=(a)=>3*a;
+  const calc=(t,a,b)=>((A(a,b)*t + B(a,b))*t + C(a))*t;
+  const slope=(t,a,b)=>3*A(a,b)*t*t + 2*B(a,b)*t + C(a);
+  return (x)=>{
+    if (x<=0) return 0; if (x>=1) return 1;
+    let t=x;
+    for (let i=0;i<8;i++){ const d=slope(t,x1,x2); if (Math.abs(d)<1e-6) break; t -= (calc(t,x1,x2)-x)/d; }
+    return calc(t,y1,y2);
+  };
+}
+const ease = cubicBezier(.2,.7,.3,1);
+const clamp01 = (v) => v<0?0:v>1?1:v;
+const lerp = (a,b,p) => a + (b-a)*p;
+
+/* steps 的时间：tts.py 用逐词边界把 cue 标定成 at；
+   万一没标上，就按步数在幕内均匀铺开，保证动画不会不动。 */
+function stepTimes(steps, dur){
+  const n = steps.length;
+  return steps.map((st,i)=> (st.at !== undefined && st.at !== null)
+    ? st.at
+    : (0.12 + 0.78 * (n<2?0:i/(n-1))) * (dur || 20));
+}
+/* 当前走到第几步（纯函数，seek 可以乱序调用） */
+function stepAt(times, local){
+  let k = 0;
+  for (let i=0;i<times.length;i++) if (local >= times[i]) k = i;
+  return k;
+}
+
+/* ---------- 全局状态 ---------- */
+let L = null, scenes = [];
+const els = [];
+
+function __init(lesson){
+  L = lesson;
+  const meta = lesson.meta;
+  const brand = meta.brand || meta.series || "";
+  document.getElementById("brand-text").textContent = brand;
+  document.getElementById("brand-mark").textContent = meta.mark || brand.trim().slice(0, 1) || "▶";
+  const wm = document.getElementById("wm");
+  wm.textContent = meta.wm || "";
+  wm.style.display = meta.wm ? "" : "none";
+  const host = document.getElementById("scenes");
+  scenes = lesson.scenes;
+  scenes.forEach((s) => {
+    const el = document.createElement("div");
+    el.className = "scene";
+    if (s.type === "title" || s.type === "outro") el.classList.add("center");
+    el.innerHTML = T[s.type](s);
+    host.appendChild(el);
+    els.push({ def: s, el, rev: [], draw: null });
+  });
+
+  // 先全部打开量一遍几何：隐藏元素量不到位置，而指针/窗口框要贴着格子摆
+  els.forEach(({def, el}) => el.classList.add("on"));
+  els.forEach(({def, el}, i) => {
+    if (def.type === "array") {
+      const cells = [...el.querySelectorAll(".cell")];
+      const wrap = el.querySelector(".rowwrap");
+      const wr = wrap.getBoundingClientRect();
+      const geo = cells.map((c) => {
+        const r = c.getBoundingClientRect();
+        return { l: r.left - wr.left, w: r.width };
+      });
+      const ptrL = el.querySelector(".ptr.l"), ptrR = el.querySelector(".ptr.r");
+      const winbox = el.querySelector(".winbox");
+      const cellsRow = el.querySelector(".cells");
+      const cr = cellsRow.getBoundingClientRect();
+      ptrR.style.top = (cr.top - wr.top - 100) + "px";        // R 在格子上方（.ptr 高 84 + 16 间距）
+      ptrL.style.top = (cr.bottom - wr.top + 16) + "px";      // L 在格子下方
+      if (winbox) {                                           // hideWin 的幕没有窗口框
+        winbox.style.top = (cr.top - wr.top - 9) + "px";
+        winbox.style.height = (cr.height + 18) + "px";
+      }
+      const vSum = el.querySelector(".v-sum"), vLen = el.querySelector(".v-len");
+      const vBest = el.querySelector(".v-best"), vNote = el.querySelector(".v-note");
+      const kChips = [...el.querySelectorAll(".chip b.v-c")];
+      const times = stepTimes(def.steps || [], def.dur);
+      els[i].draw = (local) => {
+        const steps = def.steps || [];
+        if (!steps.length) return;
+        const k = stepAt(times, local);
+        const prev = steps[Math.max(0, k-1)], cur = steps[k];
+        const p = ease(clamp01((local - times[k]) / 0.55));
+        const l = lerp(prev.l ?? cur.l ?? 0, cur.l ?? 0, p);
+        const r = lerp(prev.r ?? cur.r ?? 0, cur.r ?? 0, p);
+        const x0 = lerp(geo[l]?.l ?? 0, geo[Math.round(l)]?.l ?? 0, l - Math.floor(l));
+        const x1 = lerp(geo[r]?.l ?? 0, geo[Math.round(r)]?.l ?? 0, r - Math.floor(r));
+        const w0 = geo[0]?.w ?? 104;
+        const hidden = cur.win === false;
+        if (winbox) {
+          winbox.style.left = (x0 - 9) + "px";
+          winbox.style.width = (x1 + w0 - x0 + 18) + "px";
+          winbox.style.opacity = hidden ? 0 : 1;
+        }
+        ptrL.style.left = (x0 + w0/2) + "px";
+        ptrR.style.left = (x1 + w0/2) + "px";
+        ptrL.style.opacity = ptrR.style.opacity = hidden ? 0 : 1;
+        const src = cur.from || [];
+        cells.forEach((c, ci) => {
+          c.classList.toggle("in", !!winbox && !hidden && ci >= Math.round(l) && ci <= Math.round(r));
+          c.classList.toggle("src", src.includes(ci));
+        });
+        if (vSum) vSum.textContent = Math.round(lerp(prev.sum ?? 0, cur.sum ?? 0, p));
+        if (vLen) vLen.textContent = Math.round(lerp(prev.len ?? 0, cur.len ?? 0, p));
+        if (vBest) vBest.textContent = cur.best != null ? cur.best : "—";
+        kChips.forEach((b) => {
+          const v = cur.vals ? cur.vals[b.dataset.k] : undefined;
+          b.textContent = (v === undefined || v === null) ? "—" : v;
+        });
+        vNote.textContent = cur.verdict || "";
+      };
+    }
+    if (def.type === "flow") {
+      const nodes = [...el.querySelectorAll(".fnode")];
+      const times = stepTimes((def.steps || []).map((s) => ({ at: s.at })), def.dur);
+      const idxs = (def.steps || []).map((s) => s.i);
+      els[i].draw = (local) => {
+        if (!idxs.length) return;
+        const k = stepAt(times, local);
+        const active = idxs[k];
+        nodes.forEach((nd, ni) => {
+          nd.classList.toggle("on", ni === active);
+          nd.classList.toggle("done", ni < active);
+        });
+      };
+    }
+    /* 二维表格：把 ≤ 当前步的所有格子累积填上，当前格高亮，from 圈出来源格 */
+    if (def.type === "grid") {
+      const tds = [...el.querySelectorAll("td.gc")];
+      const kChips = [...el.querySelectorAll(".chip b.v-c")];
+      const note = el.querySelector(".v-note");
+      const times = stepTimes(def.steps || [], def.dur);
+      els[i].draw = (local) => {
+        const steps = def.steps || [];
+        if (!steps.length) return;
+        const k = stepAt(times, local), cur = steps[k];
+        tds.forEach((td) => {
+          const r = +td.dataset.row, c = +td.dataset.col;
+          let val = null;
+          for (let s = 0; s <= k; s++) {
+            const st = steps[s];
+            if (st.r === r && st.c === c && st.vals) val = Object.values(st.vals)[0];
+          }
+          td.textContent = val === null ? "" : val;
+          td.classList.toggle("filled", val !== null);
+          td.classList.toggle("cur", cur.r === r && cur.c === c);
+          td.classList.toggle("src", (cur.from || []).some((f) => f[0] === r && f[1] === c));
+        });
+        kChips.forEach((b) => {
+          const v = cur.vals ? cur.vals[b.dataset.k] : undefined;
+          b.textContent = (v === undefined || v === null) ? "—" : v;
+        });
+        if (note) note.textContent = cur.verdict || "";
+      };
+    }
+    /* 调用栈：可见到第 d 层（0 起），栈顶那一帧描蓝，ret 显示返回值 */
+    if (def.type === "stack") {
+      const frames = [...el.querySelectorAll(".frame")];
+      const vret = el.querySelector(".v-ret"), note = el.querySelector(".v-note");
+      const times = stepTimes(def.steps || [], def.dur);
+      els[i].draw = (local) => {
+        const steps = def.steps || [];
+        if (!steps.length) return;
+        const k = stepAt(times, local), cur = steps[k];
+        const d = cur.d ?? 0;
+        frames.forEach((f) => {
+          const ix = +f.dataset.i;
+          f.classList.toggle("on", ix <= d);
+          f.classList.toggle("top", ix === d);
+        });
+        if (vret) {
+          vret.textContent = cur.ret != null ? cur.ret : "—";
+          vret.style.color = cur.ret != null ? "" : "var(--ink3)";
+        }
+        if (note) note.textContent = cur.verdict || "";
+      };
+    }
+    /* 递归树 / 决策树：open 是已展开的节点，prune 是这一步剪掉的（红虚线） */
+    if (def.type === "tree") {
+      const note = el.querySelector(".v-note");
+      const times = stepTimes(def.steps || [], def.dur);
+      els[i].draw = (local) => {
+        const steps = def.steps || [];
+        if (!steps.length) return;
+        const k = stepAt(times, local), cur = steps[k];
+        const open = new Set(cur.open || []), pr = new Set(cur.prune || []);
+        el.querySelectorAll(".tedge").forEach((e2) => e2.classList.toggle("hid", !open.has(e2.dataset.child)));
+        el.querySelectorAll(".tnode").forEach((nd) => {
+          const id = nd.dataset.id, vis = open.has(id) || pr.has(id);
+          nd.classList.toggle("hid", !vis);
+          nd.classList.toggle("open", open.has(id) && !pr.has(id));
+          nd.classList.toggle("prune", pr.has(id));
+        });
+        if (note) note.textContent = cur.verdict || "";
+      };
+    }
+    /* 图：visit 上色、cur 反白、edge 加粗、queue 是底部那条队列 */
+    if (def.type === "graph") {
+      const note = el.querySelector(".v-note"), q = el.querySelector(".v-queue");
+      const times = stepTimes(def.steps || [], def.dur);
+      els[i].draw = (local) => {
+        const steps = def.steps || [];
+        if (!steps.length) return;
+        const k = stepAt(times, local), cur = steps[k];
+        const seen = new Set(cur.visit || []);
+        const hot = new Set();
+        (cur.edge || []).forEach((e2) => { hot.add(e2[0] + "|" + e2[1]); hot.add(e2[1] + "|" + e2[0]); });
+        el.querySelectorAll(".gnode").forEach((nd) => {
+          const id = nd.dataset.id;
+          nd.classList.toggle("seen", seen.has(id));
+          nd.classList.toggle("cur", cur.cur === id);
+        });
+        el.querySelectorAll(".gedge").forEach((e2) => e2.classList.toggle("hot", hot.has(e2.dataset.a + "|" + e2.dataset.b)));
+        if (q) q.innerHTML = (cur.queue || []).map((t) => `<span class="qi">${esc(t)}</span>`).join("");
+        if (note) note.textContent = cur.verdict || "";
+      };
+    }
+    /* 集合合并：每一步整体重画一遍（集合本身就是这一步的状态） */
+    if (def.type === "groups") {
+      const row = el.querySelector(".grrow"), note = el.querySelector(".v-note");
+      const times = stepTimes(def.steps || [], def.dur);
+      els[i].draw = (local) => {
+        const steps = def.steps || [];
+        if (!steps.length) return;
+        const k = stepAt(times, local), cur = steps[k];
+        const hi = new Set(cur.hi || []), mg = (cur.merge || []).slice().sort((a, b) => a - b);
+        row.innerHTML = (cur.groups || []).map((g, gi) => {
+          const label = typeof g === "string" ? g : (g.t || "");
+          const sub = typeof g === "string" ? "" : (g.s || "");
+          const arrow = mg[0] === gi ? `<span class="grarrow">⇄</span>` : "";
+          return `<div class="grp${hi.has(gi) ? " hi" : ""}"><div class="gt">${esc(label)}</div>`
+            + (sub ? `<div class="gs">${esc(sub)}</div>` : "") + `</div>${arrow}`;
+        }).join("");
+        if (note) note.textContent = cur.verdict || "";
+      };
+    }
+    // 表格与调用栈是 HTML 排版的：量一遍自然尺寸，等比缩放到容器里（小表格也放大一点，别浪费画面）
+    if (def.type === "grid" || def.type === "stack") {
+      const box = el.querySelector(".gridwrap, .stkwrap");
+      const inner = el.querySelector("table.grid, .stk");
+      const ir = inner.getBoundingClientRect();
+      const s = Math.min(1.5, box.clientHeight / ir.height, box.clientWidth / ir.width);
+      if (Math.abs(s - 1) > 0.02) {
+        inner.style.transformOrigin = "center center";
+        inner.style.transform = `scale(${s.toFixed(4)})`;
+      }
+    }
+    // 出现动画：所有带 data-r / data-at 的元素
+    els[i].rev = [...el.querySelectorAll("[data-r],[data-at]")].map((n) => ({
+      n,
+      at: n.dataset.at !== undefined ? parseFloat(n.dataset.at) : parseFloat(n.dataset.r) * def.dur,
+    }));
+  });
+  els.forEach(({el}) => el.classList.remove("on"));
+}
+
+function seek(t){
+  const total = L.duration;
+  document.getElementById("barfill").style.width = (clamp01(t / total) * 100) + "%";
+
+  const subs = L.subtitles;
+  let idx = -1;
+  for (let i = 0; i < subs.length; i++) if (t >= subs[i].start) idx = i;
+  const cur = subs[idx], prev = idx > 0 ? subs[idx - 1] : null;
+  const elCur = document.getElementById("sub-cur"), elPrev = document.getElementById("sub-prev");
+  if (cur && t <= cur.end + 0.5) {
+    elCur.textContent = cur.text;
+    elCur.style.opacity = Math.min(clamp01((t - cur.start) / 0.14), clamp01((cur.end + 0.28 - t) / 0.2));
+    if (prev && t < cur.start + 0.9) { elPrev.textContent = prev.text; elPrev.style.opacity = clamp01((cur.start + 0.9 - t) / 0.5) * 0.75; }
+    else { elPrev.textContent = ""; elPrev.style.opacity = 0; }
+  } else { elCur.style.opacity = 0; elPrev.style.opacity = 0; }
+
+  els.forEach(({ def, el, rev, draw }, i) => {
+    const local = t - def.start;
+    if (local < 0 || local > def.dur) { el.classList.remove("on"); return; }
+    el.classList.add("on");
+    const enter = ease(clamp01(local / 0.42));
+    const leave = ease(clamp01((def.dur - local) / 0.30));
+    const a = Math.min(enter, leave);
+    el.style.opacity = a;
+    el.style.transform = `translateY(${((1 - enter) * 40 - (1 - leave) * 30).toFixed(2)}px)`;
+    rev.forEach(({ n, at }) => {
+      const q = ease(clamp01((local - at) / 0.40));
+      n.style.opacity = q;
+      n.style.transform = `translateY(${((1 - q) * 22).toFixed(2)}px)`;
+    });
+    if (draw) draw(local);
+  });
+}
+
+window.__init = __init;
+window.seek = seek;
+</script>
+</body>
+</html>

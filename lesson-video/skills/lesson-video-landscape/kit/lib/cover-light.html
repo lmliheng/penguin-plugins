@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>算法专题 · 封面（浅色演示版）</title>
+<style>
+  /* 浅色封面：与 deck-light.html 同一套视觉语言（白底 + 点阵 + 单一蓝强调），一帧定格、无动画。
+     两种尺寸共用一套结构：默认 1920x1080（视频首图），body.p34 收成 1080x1440（主页 3:4）。 */
+  :root{
+    --bg:#fff; --ink:#0b1220; --ink2:#475569; --ink3:#94a3b8;
+    --line:#e6ebf2; --line2:#cbd5e1; --surface:#f8fafc;
+    --accent:#2563eb; --accent-ink:#1d4ed8; --accent-soft:#eef4ff; --accent-line:#bfd4ff;
+    --sans:"Noto Sans SC","MiSans","Segoe UI",system-ui,sans-serif;
+    --mono:"Cascadia Mono",Consolas,ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box;-webkit-font-smoothing:antialiased}
+  html,body{margin:0;padding:0;width:1920px;height:1080px;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:var(--sans)}
+  body.p34{width:1080px;height:1440px}
+
+  #grid{position:absolute;inset:0;
+    background-image:radial-gradient(rgba(148,163,184,.30) 1.6px,transparent 1.6px);
+    background-size:64px 64px}
+  #glow{position:absolute;right:-300px;top:-380px;width:1100px;height:1100px;border-radius:50%;
+    background:radial-gradient(circle,rgba(37,99,235,.12),rgba(37,99,235,0) 62%)}
+  #num{position:absolute;right:-50px;bottom:-150px;font-size:660px;font-weight:800;line-height:.78;
+    color:rgba(37,99,235,.08);letter-spacing:-.06em;user-select:none}
+
+  #top{position:absolute;left:120px;right:240px;top:64px;display:flex;align-items:center;justify-content:space-between}
+  #brand{display:flex;align-items:center;gap:16px;font-size:30px;color:var(--ink2)}
+  #brand .mark{width:40px;height:40px;border-radius:12px 12px 12px 4px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:#fff}
+  #wm{font-size:24px;color:var(--ink3);font-family:var(--mono)}
+
+  #mid{position:absolute;left:120px;right:240px;top:0;bottom:0;display:flex;flex-direction:column;
+    justify-content:center}
+  .badge{align-self:flex-start;background:var(--accent-soft);border:1.5px solid var(--accent-line);
+    color:var(--accent-ink);font-size:32px;font-weight:600;letter-spacing:.04em;
+    padding:12px 30px;border-radius:9999px;margin-bottom:40px}
+  .title{font-size:104px;font-weight:800;letter-spacing:-.045em;line-height:1.12;margin:0;text-wrap:balance}
+  .title .ln{display:block}
+  .title .hi{color:var(--accent)}
+  .rule{width:180px;height:6px;background:var(--accent);border-radius:3px;margin:44px 0 34px}
+  .sub{font-size:40px;line-height:1.4;color:var(--ink2);margin:0}
+  .sub .ln{display:block}
+  .pills{display:flex;flex-wrap:wrap;gap:16px;margin-top:40px}
+  .pill{border:1.5px solid var(--line2);border-radius:9999px;padding:12px 28px;font-size:30px;color:var(--ink2)}
+
+  #foot{position:absolute;left:120px;right:240px;bottom:64px;display:flex;align-items:center;
+    justify-content:space-between;font-size:32px;color:var(--ink2)}
+  #foot .cta{background:var(--accent);color:#fff;font-weight:700;border-radius:14px;padding:16px 36px;font-size:30px}
+
+  /* 主页 3:4：结构不动，字号与留白收一点，避免上下被裁 */
+  .p34 #top{left:80px;right:90px;top:74px}
+  .p34 #brand{font-size:26px;gap:14px}
+  .p34 #brand .mark{width:36px;height:36px;font-size:20px}
+  .p34 #wm{font-size:22px}
+  .p34 #mid{left:80px;right:90px}
+  .p34 .badge{font-size:28px;padding:10px 26px;margin-bottom:36px}
+  .p34 .title{font-size:88px}
+  .p34 .rule{width:160px;height:5px;margin:40px 0 30px}
+  .p34 .sub{font-size:36px}
+  .p34 .pills{margin-top:36px;gap:14px}
+  .p34 .pill{font-size:27px;padding:10px 24px}
+  .p34 #foot{left:80px;right:90px;bottom:74px;font-size:28px}
+  .p34 #foot .cta{font-size:26px;padding:14px 30px}
+  .p34 #num{font-size:580px;right:-30px;bottom:-120px}
+</style>
+</head>
+<body>
+<div id="grid"></div>
+<div id="glow"></div>
+<div id="num"></div>
+<div id="top">
+  <div id="brand"><span class="mark" id="brand-mark"></span><span id="brand-text"></span></div>
+  <div id="wm"></div>
+</div>
+<div id="mid">
+  <div class="badge" id="badge"></div>
+  <h1 class="title" id="title"></h1>
+  <div class="rule"></div>
+  <p class="sub" id="sub"></p>
+  <div class="pills" id="pills"></div>
+</div>
+<div id="foot">
+  <span id="foot-left"></span>
+  <span class="cta" id="cta"></span>
+</div>
+<script>
+"use strict";
+const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+window.__init = function (c, size) {
+  if (size === "p34") document.body.classList.add("p34");
+  const brand = c.brand || "";
+  document.getElementById("brand-text").textContent = brand;
+  document.getElementById("brand-mark").textContent = c.mark || brand.trim().slice(0, 1) || "▶";
+  const wm = document.getElementById("wm");
+  wm.textContent = c.wm || "";
+  wm.style.display = c.wm ? "" : "none";
+  const cta = document.getElementById("cta");
+  cta.textContent = c.cta || "";
+  cta.style.display = c.cta ? "" : "none";
+  document.getElementById("badge").textContent = c.no ? "第 " + c.no + " 集" + (c.tag ? " · " + c.tag : "") : (c.tag || "");
+  document.getElementById("title").innerHTML =
+    c.titleLines.map((l, i) => `<span class="ln${i === c.titleLines.length - 1 && c.hiLast !== false ? " hi" : ""}">${esc(l)}</span>`).join("");
+  document.getElementById("sub").innerHTML =
+    c.subLines.map((l) => `<span class="ln">${esc(l)}</span>`).join("");
+  document.getElementById("pills").innerHTML = c.pills.map((p) => `<span class="pill">${esc(p)}</span>`).join("");
+  document.getElementById("num").textContent = c.no || "";
+  document.getElementById("foot-left").textContent = c.foot || "";
+  document.title = (c.no || "") + " " + c.titleLines.join("");
+};
+</script>
+</body>
+</html>

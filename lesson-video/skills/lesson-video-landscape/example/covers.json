@@ -1,0 +1,14 @@
+[
+  {
+    "id": "demo-light",
+    "no": "1",
+    "brand": "版式示例 · 横屏课件",
+    "wm": "@GitHub/your-handle",
+    "cta": "关注抖音号 your-handle",
+    "titleLines": ["横屏课件", "十一套版式"],
+    "subLines": ["一千九百二十乘一千零八十的画布", "十一幕把版式各跑一遍"],
+    "pills": ["横屏", "版式", "示例"],
+    "tag": "示例",
+    "foot": "版式示例 · 第 1 集"
+  }
+]
